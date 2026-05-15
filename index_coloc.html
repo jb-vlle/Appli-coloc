@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏠 Coloc JB & Nino</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; 
+            color: #333;
+        }
+        .app { max-width: 500px; margin: 0 auto; min-height: 100vh; background: white; box-shadow: 0 0 50px rgba(0,0,0,0.3); }
+        .header { 
+            background: linear-gradient(135deg, #ff6b6b, #feca57); 
+            color: white; padding: 1rem; text-align: center; 
+            position: sticky; top: 0; z-index: 100;
+        }
+        .nav { display: flex; background: #f8f9fa; border-bottom: 1px solid #eee; }
+        .nav-btn { flex: 1; padding: 1rem; border: none; background: none; cursor: pointer; transition: all 0.3s; }
+        .nav-btn.active { background: #007bff; color: white; }
+        .section { display: none; padding: 1.5rem; min-height: 80vh; }
+        .section.active { display: block; }
+        
+        /* Dashboard */
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .card { background: white; padding: 1.5rem; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .balance { font-size: 2rem; font-weight: bold; text-align: center; }
+        .positive { color: #28a745; } .negative { color: #dc3545; }
+        .urgent { background: #fff3cd; border-left: 4px solid #ffc107; }
+        .task-item, .expense-item, .shopping-item { 
+            display: flex; gap: 1rem; padding: 1rem; background: #f8f9fa; margin-bottom: 0.5rem; 
+            border-radius: 10px; align-items: center;
+        }
+        .status-urgent { color: #dc3545; font-weight: bold; }
+        .status-soon { color: #ffc107; }
+        .btn { 
+            padding: 0.5rem 1rem; border: none; border-radius: 25px; cursor: pointer; 
+            font-weight: bold; transition: all 0.3s;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .input-group { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        input, select { flex: 1; padding: 0.75rem; border: 2px solid #eee; border-radius: 10px; }
+        .checkbox { transform: scale(1.5); margin-right: 0.5rem; }
+        .user-jb { border-left: 4px solid #007bff; }
+        .user-nino { border-left: 4px solid #28a745; }
+        .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; }
+        .day { padding: 0.75rem; background: #f8f9fa; border-radius: 10px; text-align: center; }
+        .today { background: #007bff; color: white; }
+        .rotation { font-size: 0.9rem; opacity: 0.8; }
+        @media (max-width: 480px) { .dashboard-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <h1>🏠 Coloc JB & Nino</h1>
+            <div id="currentUser"></div>
+        </div>
+        
+        <nav class="nav">
+            <button class="nav-btn active" data-section="dashboard">📊 Tableau</button>
+            <button class="nav-btn" data-section="expenses">💸 Dépenses</button>
+            <button class="nav-btn" data-section="tasks">✅ Tâches</button>
+            <button class="nav-btn" data-section="planning">📅 Planning</button>
+            <button class="nav-btn" data-section="shopping">🛒 Courses</button>
+            <button class="nav-btn" data-section="rules">📜 Règles</button>
+            <button class="nav-btn" data-section="messages">💬 Messages</button>
+        </nav>
+
+        <!-- DASHBOARD -->
+        <section id="dashboard" class="section active">
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>Solde JB → Nino</h3>
+                    <div id="balanceJB" class="balance">0€</div>
+                </div>
+                <div class="card">
+                    <h3>Solde Nino → JB</h3>
+                    <div id="balanceNino" class="balance">0€</div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>🚨 Tâches urgentes</h3>
+                <div id="urgentTasks"></div>
+            </div>
+            <div class="card">
+                <h3>🛒 Courses</h3>
+                <div id="shoppingList"></div>
+            </div>
+        </section>
+
+        <!-- DÉPENSES -->
+        <section id="expenses" class="section">
+            <div class="input-group">
+                <input id="expenseAmount" type="number" placeholder="Montant €" step="0.01">
+                <input id="expenseDesc" type="text" placeholder="Description">
+                <select id="expensePayer">
+                    <option value="jb">JB paye</option>
+                    <option value="nino">Nino paye</option>
+                </select>
+                <select id="expenseCat">
+                    <option>🍚 Nourriture</option>
+                    <option>💡 Électricité</option>
+                    <option>🚿 Eau</option>
+                    <option>🧹 Nettoyage</option>
+                    <option>🎮 Loisirs</option>
+                    <option>💰 Autre</option>
+                </select>
+                <button class="btn btn-primary" onclick="addExpense()">Ajouter</button>
+            </div>
+            <div id="expensesList"></div>
+            <button class="btn btn-warning" onclick="remindFriend()" style="width:100%; margin-top:1rem;">📱 Rappeler mon coloc !</button>
+        </section>
+
+        <!-- TÂCHES -->
+        <section id="tasks" class="section">
+            <div class="input-group">
+                <input id="taskDesc" type="text" placeholder="Nouvelle tâche">
+                <select id="taskAssign">
+                    <option value="jb">Assigner à JB</option>
+                    <option value="nino">Assigner à Nino</option>
+                    <option value="both">Les deux</option>
+                </select>
+                <input id="taskDue" type="date">
+                <button class="btn btn-success" onclick="addTask()">Ajouter</button>
+            </div>
+            <div id="tasksList"></div>
+            <div style="margin-top:1rem; padding:1rem; background:#e9ecef; border-radius:10px;">
+                <h4>⚖️ Équité tâches</h4>
+                <div>JB: <span id="taskCountJB">0</span> | Nino: <span id="taskCountNino">0</span></div>
+            </div>
+        </section>
+
+        <!-- PLANNING -->
+        <section id="planning" class="section">
+            <h3>📅 Semaine en cours</h3>
+            <div class="calendar" id="calendar"></div>
+            <div style="margin-top:2rem;">
+                <h4>Rotation automatique corvées</h4>
+                <div id="rotationInfo"></div>
+            </div>
+        </section>
+
+        <!-- COURSES -->
+        <section id="shopping" class="section">
+            <div class="input-group">
+                <input id="shoppingItem" type="text" placeholder="Article (Entrée pour ajouter)">
+                <select id="shoppingCat">
+                    <option>🥛 Frais</option>
+                    <option>🍞 Boulangerie</option>
+                    <option>🥫 Conserves</option>
+                    <option>🧀 Fromage</option>
+                    <option>🍝 Pâtes</option>
+                    <option>🍚 Riz</option>
+                </select>
+                <button class="btn btn-primary" onclick="addShoppingItem()">Ajouter</button>
+                <button class="btn btn-danger" onclick="clearCheckedShopping()" style="margin-left:0.5rem;">Vider cochés</button>
+            </div>
+            <div id="shoppingListFull"></div>
+        </section>
+
+        <!-- RÈGLES -->
+        <section id="rules" class="section">
+            <h3>📜 Règles de vie</h3>
+            <div class="input-group">
+                <input id="ruleText" type="text" placeholder="Nouvelle règle">
+                <button class="btn btn-primary" onclick="addRule()">Ajouter</button>
+            </div>
+            <div id="rulesList"></div>
+        </section>
+
+        <!-- MESSAGES -->
+        <section id="messages" class="section">
+            <div class="input-group">
+                <input id="messageText" type="text" placeholder="Laisser un message...">
+                <select id="messageTag">
+                    <option value="">Sans tag</option>
+                    <option value="urgent">🚨 URGENT</option>
+                    <option value="idea">💡 Idée</option>
+                    <option value="info">ℹ️ Info</option>
+                </select>
+                <button class="btn btn-primary" onclick="addMessage()">Envoyer</button>
+            </div>
+            <div id="messagesList"></div>
+        </section>
+    </div>
+
+    <script>
+        // 🔥 SYNCHRONISATION TEMPS RÉEL
+        let db = null;
+        let currentUser = localStorage.getItem('colocUser') || 'jb';
+        const USERS = { jb: 'Jean-Baptiste 💙', nino: 'Nino 💚' };
+
+        // Init IndexedDB
+        const request = indexedDB.open('ColocDB', 1);
+        request.onupgradeneeded = (e) => {
+            db = e.target.result;
+            db.createObjectStore('data', { keyPath: 'id', autoIncrement: true });
+            db.createObjectStore('sync', { keyPath: 'key' });
+        };
+        request.onsuccess = (e) => {
+            db = e.target.result;
+            loadAllData();
+            setupSync();
+        };
+
+        // Service Worker pour sync offline/online
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+
+        // Navigation
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelector('.nav-btn.active').classList.remove('active');
+                document.querySelector('.section.active').classList.remove('active');
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.section).classList.add('active');
+                if (btn.dataset.section === 'planning') updateCalendar();
+                if (btn.dataset.section === 'tasks') updateTaskEquity();
+            };
+        });
+
+        // Switch user
+        document.getElementById('currentUser').innerHTML = `
+            <small>${USERS[currentUser]} 
+            <button onclick="switchUser()" style="background:none;border:none;font-size:1.2em;">👤</button>
+            </small>`;
+
+        function switchUser() {
+            currentUser = currentUser === 'jb' ? 'nino' : 'jb';
+            localStorage.setItem('colocUser', currentUser);
+            document.getElementById('currentUser').innerHTML = `
+                <small>${USERS[currentUser]} 
+                <button onclick="switchUser()" style="background:none;border:none;font-size:1.2em;">👤</button>
+                </small>`;
+            loadAllData();
+        }
+
+        // DÉPENSES
+        async function addExpense() {
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            const desc = document.getElementById('expenseDesc').value;
+            const payer = document.getElementById('expensePayer').value;
+            const cat = document.getElementById('expenseCat').value;
+            
+            if (!amount || !desc) return;
+            
+            const tx = db.transaction(['data'], 'readwrite');
+            tx.objectStore('data').add({
+                type: 'expense',
+                amount, desc, payer, cat,
+                date: new Date().toISOString(),
+                userClass: payer
+            });
+            await tx.done;
+            
+            document.getElementById('expenseAmount').value = '';
+            document.getElementById('expenseDesc').value = '';
+            loadExpenses();
+            updateBalances();
+            broadcastUpdate('expenses');
+        }
+
+        async function loadExpenses() {
+            const tx = db.transaction(['data']);
+            const expenses = await new Promise(r => {
+                const req = tx.objectStore('data').getAll('expense');
+                req.onsuccess = () => r(req.result);
+            });
+            
+            document.getElementById('expensesList').innerHTML = expenses.map(e => `
+                <div class="expense-item ${e.userClass}">
+                    <strong>${e.amount.toFixed(2)}€</strong> 
+                    ${e.desc} 
+                    <small>${e.cat} - ${new Date(e.date).toLocaleDateString()}</small>
+                    <button class="btn btn-danger" onclick="deleteItem(${e.id})" style="margin-left:auto;">🗑️</button>
+                </div>
+            `).reverse().join('');
+        }
+
+        // TÂCHES
+        async function addTask() {
+            const desc = document.getElementById('taskDesc').value;
+            const assign = document.getElementById('taskAssign').value;
+            const due = document.getElementById('taskDue').value;
+            
+            if (!desc) return;
+            
+            const tx = db.transaction(['data'], 'readwrite');
+            tx.objectStore('data').add({
+                type: 'task',
+                desc, assign, due: due || null,
+                completed: false,
+                date: new Date().toISOString(),
+                userClass: assign
+            });
+            await tx.done;
+            
+            document.getElementById('taskDesc').value = '';
+            loadTasks();
+            updateTaskEquity();
+            broadcastUpdate('tasks');
+        }
+
+        async function loadTasks() {
+            const tx = db.transaction(['data']);
+            const tasks = await new Promise(r => {
+                const req = tx.objectStore('data').getAll('task');
+                req.onsuccess = () => r(req.result);
+            });
+            
+            const urgentTasks = tasks.filter(t => !t.completed && t.due && 
+                new Date(t.due) < new Date(Date.now() + 24*60*60*1000));
+            
+            document.getElementById('urgentTasks').innerHTML = urgentTasks.map(t => `
+                <div class="task-item urgent status-urgent">
+                    🚨 ${t.desc} <small>(${new Date(t.due).toLocaleDateString()})</small>
+                </div>
+            `).join('') || '<div style="opacity:0.5">Aucune tâche urgente</div>';
+
+            document.getElementById('tasksList').innerHTML = tasks.map(t => {
+                const status = !t.completed ? 
+                    (t.due && new Date(t.due) < new Date(Date.now() + 24*60*60*1000) ? 'status-urgent' :
+                     t.due && new Date(t.due) < new Date(Date.now() + 3*24*60*60*1000) ? 'status-soon' : '') : 'completed';
+                return `
+                    <div class="task-item ${t.userClass} ${status}">
+                        <input type="checkbox" class="checkbox" ${t.completed ? 'checked' : ''} 
+                               onchange="toggleTask(${t.id}, this.checked)">
+                        <strong>${t.desc}</strong>
+                        ${t.due ? `<small>${new Date(t.due).toLocaleDateString()}</small>` : ''}
+                        <button class="btn btn-danger" onclick="deleteItem(${t.id})" style="margin-left:auto;">🗑️</button>
+                    </div>
+                `;
+            }).reverse().join('');
+        }
+
+        async function toggleTask(id, completed) {
+            const tx = db.transaction(['data'], 'readwrite');
+            const store = tx.objectStore('data');
+            const task = await new Promise(r => {
+                store.get(id).onsuccess = e => r(e.target.result);
+            });
+            task.completed = completed;
+            store.put(task);
+            await tx.done;
+            loadTasks();
+            updateTaskEquity();
+            broadcastUpdate('tasks');
+        }
+
+        // COURSES
+        document.getElementById('shoppingItem').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addShoppingItem();
+        });
+
+        async function addShoppingItem() {
+            const item = document.getElementById('shoppingItem').value;
+            const cat = document.getElementById('shoppingCat').value;
+            if (!item) return;
+            
+            const tx = db.transaction(['data'], 'readwrite');
+            tx.objectStore('data').add({ type: 'shopping', item, cat, checked: false });
+            await tx.done;
+            
+            document.getElementById('shoppingItem').value = '';
+            loadShopping();
+            broadcastUpdate('shopping');
+        }
+
+        async function loadShopping() {
+            const tx = db.transaction(['data']);
+            const items = await new Promise(r => {
+                const req = tx.objectStore('data').getAll('shopping');
+                req.onsuccess = () => r(req.result);
+            });
+            
+            // Dashboard preview
+            const unchecked = items.filter(i => !i.checked);
+            document.getElementById('shoppingList').innerHTML = unchecked.slice(0,3).map(i => i.item).join(', ') || 'Liste vide';
+
+            // Full list
+            document.getElementById('shoppingListFull').innerHTML = items.map(i => `
+                <div class="task-item shopping-item">
+                    <input type="checkbox" class="checkbox" ${i.checked ? 'checked' : ''} 
+                           onchange="toggleShopping(${i.id}, this.checked)">
+                    <span style="${i.checked ? 'text-decoration:line-through; opacity:0.5' : ''}">📦 ${i.item}</span>
+                    <small style="margin-left:auto">${i.cat}</small>
+                    <button class="btn btn-danger" onclick="deleteItem(${i.id})">🗑️</button>
+                </div>
+            `).reverse().join('');
+        }
+
+        async function toggleShopping(id, checked) {
+            const tx = db.transaction(['data'], 'readwrite');
+            const store = tx.objectStore('data');
+            const item = await new Promise(r => {
+                store.get(id).onsuccess = e => r(e.target.result);
+            });
+            item.checked = checked;
+            store.put(item);
+            await tx.done;
+            loadShopping();
+            broadcastUpdate('shopping');
+        }
+
+        async function clearCheckedShopping() {
+            const tx = db.transaction(['data'], 'readwrite');
+            const store = tx.objectStore('data');
+            const items = await new Promise(r => {
+                store.getAll('shopping').onsuccess = e => r(e.target.result);
+            });
+            for (let item of items.filter(i => i.checked)) {
+                store.delete(item.id);
+            }
+            await tx.done;
+            loadShopping();
+            broadcastUpdate('shopping');
+        }
+
+        // RÈGLES
+        async function addRule() {
+            const text = document.getElementById('ruleText').value;
+            if (!text) return;
+            
+            const tx = db.transaction(['data'], 'readwrite');
+            tx.objectStore('data').add({
+                type: 'rule',
+                text,
+                approved: { jb: false, nino: false },
+                date: new Date().toISOString()
+            });
+            await tx.done;
+            
+            document.getElementById('ruleText').value = '';
+            loadRules();
+            broadcastUpdate('rules');
+        }
+
+        async function loadRules() {
+            const tx = db.transaction(['data']);
+            const rules = await new Promise(r => {
+                const req = tx.objectStore('data').getAll('rule');
+                req.onsuccess = () => r(req.result);
+            });
+            
+            document.getElementById('rulesList').innerHTML = rules.map(rule => {
+                const approvedCount = (rule.approved.jb ? 1 : 0) + (rule.approved.nino ? 1 : 0);
+                return `
+                    <div class="task-item" style="justify-content:space-between;">
+                        <div>
+                            📜 ${rule.text}
+                            <small style="display:block">${approvedCount}/2 approuvé${approvedCount !== 1 ? 's' : ''}</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-success" onclick="approveRule(${rule.id}, 'jb')" 
+                                    style="margin-right:0.5rem; padding:0.25rem 0.5rem; font-size:0.8rem;"
+                                    ${rule.approved.jb ? 'disabled' : ''}>JB</button>
+                            <button class="btn btn-success" onclick="approveRule(${rule.id}, 'nino')"
+                                    style="padding:0.25rem 0.5rem; font-size:0.8rem;"
+                                    ${rule.approved.nino ? 'disabled' : ''}>Nino</button>
+                            <button class="btn btn-danger" onclick="deleteItem(${rule.id})" style="margin-left:0.5rem;">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            }).reverse().join('');
+        }
+
+        async function approveRule(id, user) {
+            const tx = db.transaction(['data'], 'readwrite');
+            const store = tx.objectStore('data');
+            const rule = await new Promise(r => {
+                store.get(id).onsuccess = e => r(e.target.result);
+            });
+            rule.approved[user] = true;
+            store.put(rule);
+            await tx.done;
+            loadRules();
+            broadcastUpdate('rules');
+        }
+
+        // MESSAGES
+        async function addMessage() {
+            const text = document.getElementById('messageText').value;
+            const tag = document.getElementById('messageTag').value;
+            if (!text) return;
+            
+            const tx = db.transaction(['data'], 'readwrite');
+            tx.objectStore('data').add({
+                type: 'message',
+                text, tag,
+                from: currentUser,
+                date: new Date().toISOString(),
+                read: false
+            });
+            await tx.done;
+            
+            document.getElementById('messageText').value = '';
+            loadMessages();
+            broadcastUpdate('messages');
+        }
+
+        async function loadMessages() {
+            const tx = db.transaction(['data']);
+            const messages = await new Promise(r => {
+                const req = tx.objectStore('data').getAll('message');
+                req.onsuccess = () => r(req.result);
+            });
+            
+            document.getElementById('messagesList').innerHTML = messages.map(m => {
+                const tagClass = m.tag === 'urgent' ? 'status-urgent' : '';
+                return `
+                    <div class="task-item ${m.from} ${tagClass}">
+                        <div>
+                            <strong>${USERS[m.from]}:</strong> ${m.text}
+                            ${m.tag ? `<span style="color:#dc3545; font-weight:bold"> ${m.tag.toUpperCase()}</span>` : ''}
+                            <small>${new Date(m.date).toLocaleString()}</small>
+                        </div>
+                        ${!m.read ? '<div style="width:10px;height:10px;background:#007bff;border-radius:50%;margin-left:auto;"></div>' : ''}
+                        <button class="btn btn-danger" onclick="deleteItem(${m.id})" style="margin-left:auto;">🗑️</button>
+                    </div>
+                `;
+            }).reverse().join('');
+        }
+
+        // SOLDES
+        async function updateBalances() {
+            const tx = db.transaction(['data']);
+            const expenses = await new Promise(r => {
+                const req = tx.objectStore('data').getAll('expense');
+                req.onsuccess = () => r(req.result);
+            });
+            
+            let jbOwesNino = 0;
+            expenses.forEach(e => {
+                if (e.payer === 'jb') {
+                    jbOwesNino -= e.amount / 2;
+                } else {
+                    jbOwesNino += e.amount / 2;
+                }
+            });
+            
+            document.getElementById('balanceJB').textContent = `${jbOwesNino > 0 ? '+' : ''}${jbOwesNino.toFixed(2)}€`;
+            document.getElementById('balanceJB').className = `balance ${jbOwesNino > 0 ? 'positive' : 'negative'}`;
+            
+            document.getElementById('balanceNino').textContent = `${jbOwesNino < 0 ? '+' : ''}${(-jbOwesNino).toFixed(2)}€`;
+            document.getElementById('balanceNino').className = `balance ${jbOwesNino < 0 ? 'positive' : 'negative'}`;
+        }
+
+        // ÉQUITÉ TÂCHES
+        async function updateTaskEquity() {
+            const tx = db.transaction(['data']);
+            const tasks = await new Promise(r => {
+                const req = tx.objectStore('data').getAll('task');
+                req.onsuccess = () => r(req.result);
+            });
+            
+            const completedJB = tasks.filter(t => t.completed && t.assign === 'jb').length;
+            const completedNino = tasks.filter(t => t.completed && t.assign === 'nino').length;
+            
+            document.getElementById('taskCountJB').textContent = completedJB;
+            document.getElementById('taskCountNino').textContent = completedNino;
+        }
+
+        // PLANNING
+        function updateCalendar() {
+            const calendar = document.getElementById('calendar');
+            const today = new Date();
+            const startWeek = new Date(today);
+            startWeek.setDate(today.getDate() - today.getDay());
+            
+            calendar.innerHTML = '';
+            for (let i = 0; i < 7; i++) {
+                const day = new Date(startWeek);
+                day.setDate(startWeek.getDate() + i);
+                const dayStr = day.toLocaleDateString('fr-FR', {weekday: 'short', day: 'numeric'});
+                const isToday = day.toDateString() === today.toDateString();
+                
+                // Rotation corvées (exemple: aspirateur, poubelles...)
+                const chores = ['🧹 Aspirateur', '♻️ Poubelles', '🧼 Salle de bain', '🍽️ Vaisselle'];
+                const rotationIndex = (day.getDate() + i) % chores.length;
+                const chore = chores[rotationIndex];
+                const responsible = (day.getDate() + i) % 2 === 0 ? 'JB' : 'Nino';
+                
+                calendar.innerHTML += `
+                    <div class="day ${isToday ? 'today' : ''}">
+                        <div>${dayStr}</div>
+                        <div class="rotation">${chore} → <strong>${responsible}</strong></div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('rotationInfo').innerHTML = `
+                <div style="background:#e9ecef; padding:1rem; border-radius:10px; margin-top:1rem;">
+                    Prochaine corvée: ${today.getDate() % 2 === 0 ? 'Nino' : 'JB'}
+                </div>
+            `;
+        }
+
+        // SUPPRESSION
+        async function deleteItem(id) {
+            const tx = db.transaction(['data'], 'readwrite');
+            tx.objectStore('data').delete(id);
+            await tx.done;
+            loadAllData();
+            broadcastUpdate('all');
+        }
+
+        // RAPPEL
+        function remindFriend() {
+            if (confirm('Envoyer une notification à ton coloc ?')) {
+                if (Notification.permission === 'granted') {
+                    new Notification('💸 Rappel coloc !', {
+                        body: 'Vérifie les dépenses et tâches !',
+                        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🏠</text></svg>'
+                    });
+                } else {
+                    Notification.requestPermission();
+                }
+                // Broadcast au coloc
+                broadcastUpdate('reminder');
+            }
+        }
+
+        // SYNCHRO TEMPS RÉEL
+        async function loadAllData() {
+            await Promise.all([
+                loadExpenses(),
+                loadTasks(),
+                loadShopping(),
+                loadRules(),
+                loadMessages(),
+                updateBalances(),
+                updateTaskEquity()
+            ]);
+        }
+
+        async function broadcastUpdate(type) {
+            // Sauvegarde timestamp sync
+            const tx = db.transaction(['sync'], 'readwrite');
+            await new Promise(r => {
+                tx.objectStore('sync').put({ key: 'lastSync', timestamp: Date.now() }, 'lastSync');
+                tx.oncomplete = r;
+            });
+            
+            // Broadcast via BroadcastChannel (temps réel entre onglets/app)
+            const channel = new BroadcastChannel('coloc-channel');
+            channel.postMessage({ type, timestamp: Date.now() });
+        }
+
+        function setupSync() {
+            const channel = new BroadcastChannel('coloc-channel');
+            channel.onmessage = () => loadAllData();
+            
+            // Sync périodique
+            setInterval(() => {
+                broadcastUpdate('heartbeat');
+            }, 30000);
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAllData();
+            updateCalendar();
+            document.getElementById('shoppingItem').focus();
+        });
+    </script>
+</body>
+</html>
